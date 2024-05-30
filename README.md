@@ -27,6 +27,12 @@ sudo apt-get install build-essential cmake git pkg-config libgtk-3-dev \
     libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev \
     gfortran openexr libatlas-base-dev python3-dev python3-numpy \
     libtbb2 libtbb-dev libdc1394-22-dev
+
+
+수정
+sudo apt-get install build-essential cmake git pkg-config libgtk-3-dev \libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev \gfortran openexr libatlas-base-dev python3-dev python3-numpy \libtbb-dev libdc1394-22-dev
+
+    
     
 3. OpenCV 소스 코드 다운로드
 OpenCV와 OpenCV Contrib 모듈의 소스 코드를 다운로드합니다.
