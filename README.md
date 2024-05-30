@@ -32,6 +32,19 @@ sudo apt-get install build-essential cmake git pkg-config libgtk-3-dev \
 수정
 sudo apt-get install build-essential cmake git pkg-config libgtk-3-dev \libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev \gfortran openexr libatlas-base-dev python3-dev python3-numpy \libtbb-dev libdc1394-22-dev
 
+
+libdc1394-22-dev패키지 없는경우
+1. sudo apt-get install libdc1394-22 libdc1394-22-dev 입력
+2. 빌드
+wget https://github.com/ffainelli/libdc1394/archive/master.zip
+unzip master.zip
+cd libdc1394-master
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+
     
     
 3. OpenCV 소스 코드 다운로드
