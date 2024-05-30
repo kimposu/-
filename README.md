@@ -2,7 +2,8 @@
 1. try
 https://how2electronics.com/how-to-install-setup-opencv-on-raspberry-pi-4/
 
-2. try - TensorFlow >> raspberry Pi 학습 >>>>>>>>>                    https://seo-dh-elec.tistory.com/32
+2. try - TensorFlow >> raspberry Pi 학습 >>>>>>>>>                    https://seo-dh-elec.tistory.com/32   >>>>>>  3번까지 
+
 3. https://www.tensorflow.org/lite/guide/build_rpi?hl=ko
 
 4. 
