@@ -110,3 +110,14 @@ Traceback (most recent call last):
   File "/home/GM/TFLite_detection_webcam.py", line 102, in <module>
     from tensorflow.lite.python.interpreter import Interpreter
 ModuleNotFoundError: No module named 'tensorflow'
+
+
+
+
+Traceback (most recent call last):
+  File "/home/GM/TFLite_detection_webcam.py", line 180, in <module>
+    frame = frame1.copy()
+            ^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'copy'
+
+
