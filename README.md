@@ -1,196 +1,190 @@
-객체인식 프로그램
-1. try
-https://how2electronics.com/how-to-install-setup-opencv-on-raspberry-pi-4/
+pip install deep_sort_realtime
 
-2. try - TensorFlow >> raspberry Pi 학습 >>>>>>>>>                    https://seo-dh-elec.tistory.com/32   >>>>>>  3번까지 
-
-3. https://www.tensorflow.org/lite/guide/build_rpi?hl=ko
-
-4. 
-==============================================================
-오픈 CV 설치
-
-1. 라즈베리 파이 업데이트
-먼저 라즈베리 파이의 패키지 리스트와 설치된 패키지를 최신 상태로 업데이트합니다.
-
-bash
-코드 복사
-sudo apt-get update
-sudo apt-get upgrade
-
-2. 필수 패키지 설치
-OpenCV를 빌드하고 사용하는 데 필요한 패키지들을 설치합니다.
-
-bash
-코드 복사
-sudo apt-get install build-essential cmake git pkg-config libgtk-3-dev \
-    libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
-    libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev \
-    gfortran openexr libatlas-base-dev python3-dev python3-numpy \
-    libtbb2 libtbb-dev libdc1394-22-dev
-
-
-수정
-sudo apt-get install build-essential cmake git pkg-config libgtk-3-dev \libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \libxvidcore-dev libx264-dev libjpeg-dev libpng-dev libtiff-dev \gfortran openexr libatlas-base-dev python3-dev python3-numpy \libtbb-dev libdc1394-22-dev
-
-
-libdc1394-22-dev패키지 없는경우
-1. sudo apt-get install libdc1394-22 libdc1394-22-dev 입력
-2. 빌드
-wget https://github.com/ffainelli/libdc1394/archive/master.zip
-unzip master.zip
-cd libdc1394-master
-mkdir build
-cd build
-cmake ..
-make
-sudo make install
-
-    
-    
-3. OpenCV 소스 코드 다운로드
-OpenCV와 OpenCV Contrib 모듈의 소스 코드를 다운로드합니다.
-
-bash
-코드 복사
-cd ~
-git clone https://github.com/opencv/opencv.git
-git clone https://github.com/opencv/opencv_contrib.git
-
-
-4. OpenCV 빌드 디렉토리 생성
-빌드를 위한 디렉토리를 생성하고 이동합니다.
-
-bash
-코드 복사
-cd ~/opencv
-mkdir build
-cd build
-
-
-5. CMake를 사용하여 OpenCV 설정
-CMake를 사용하여 OpenCV 빌드 설정을 합니다. 이때 opencv_contrib 모듈의 경로를 지정합니다.
-
-bash
-코드 복사
-cmake -D CMAKE_BUILD_TYPE=RELEASE \
-    -D CMAKE_INSTALL_PREFIX=/usr/local \
-    -D OPENCV_EXTRA_MODULES_PATH=~/opencv_contrib/modules \
-    -D ENABLE_NEON=ON \
-    -D ENABLE_VFPV3=ON \
-    -D BUILD_TESTS=OFF \
-    -D INSTALL_PYTHON_EXAMPLES=OFF \
-    -D BUILD_EXAMPLES=OFF ..
-
-    
-6. OpenCV 빌드 및 설치
-빌드하고 설치합니다. 라즈베리 파이의 성능을 고려하여 make 명령어 뒤에 -j4 옵션을 추가하여 병렬 빌드를 수행합니다. -j4는 4개의 코어를 사용하여 빌드하는 것을 의미합니다.
-
-bash
-코드 복사
-make -j4
-sudo make install
-sudo ldconfig
-
-
-7. 설치 확인
-OpenCV가 제대로 설치되었는지 확인합니다. Python 인터프리터를 실행하고 OpenCV를 임포트해봅니다.
-
-bash
-코드 복사
-python3
-python
-코드 복사
+import subprocess
+import argparse
+import os
+import sys
+from pathlib import Path
+import Arm_Lib
+import PID
 import cv2
-print(cv2.__version__)
+import torch
+import torch.backends.cudnn as cudnn
+from deep_sort_realtime.deepsort_tracker import DeepSort  # DeepSORT 추가
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))
+
+from models.common import DetectMultiBackend
+from utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
+from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
+                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
+from utils.plots import Annotator, colors, save_one_box
+from utils.torch_utils import select_device, time_sync
 
 
-=================== error code============
-Traceback (most recent call last):
-  File "/home/GM/TFLite_detection_webcam.py", line 102, in <module>
-    from tensorflow.lite.python.interpreter import Interpreter
-ModuleNotFoundError: No module named 'tensorflow'
+@torch.no_grad()
+def run(weights=ROOT / 'yolov5s.pt',
+        source=ROOT / 'data/images',
+        data=ROOT / 'data/coco128.yaml',
+        imgsz=(640, 640),
+        conf_thres=0.25,
+        iou_thres=0.45,
+        max_det=1000,
+        device='',
+        view_img=False,
+        save_txt=False,
+        save_conf=False,
+        save_crop=False,
+        nosave=False,
+        classes=None,
+        agnostic_nms=False,
+        augment=False,
+        visualize=False,
+        update=False, 
+        project=ROOT / 'runs/detect',
+        name='exp',
+        exist_ok=False,
+        line_thickness=3,
+        hide_labels=False,
+        hide_conf=False,
+        half=False, 
+        dnn=False,
+        ):
+    
+    source = str(source)
+    save_img = not nosave and not source.endswith('.txt')
+    is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
+    is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
+    webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
+    if is_url and is_file:
+        source = check_file(source)
 
+    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)
+    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)
 
+    device = select_device(device)
+    model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data)
+    stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
+    imgsz = check_img_size(imgsz, s=stride)
 
+    half &= (pt or jit or onnx or engine) and device.type != 'cpu'
+    if pt or jit:
+        model.model.half() if half else model.model.float()
 
-Traceback (most recent call last):
-  File "/home/GM/TFLite_detection_webcam.py", line 180, in <module>
-    frame = frame1.copy()
-            ^^^^^^^^^^^
-AttributeError: 'NoneType' object has no attribute 'copy'
+    if webcam:
+        view_img = check_imshow()
+        cudnn.benchmark = True
+        dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt)
+        bs = len(dataset)
+    else:
+        dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
+        bs = 1
+    vid_path, vid_writer = [None] * bs, [None] * bs
 
-========================= 코드 수정
-import cv2
-import numpy as np
-from tflite_runtime.interpreter import Interpreter
+    model.warmup(imgsz=(1, 3, *imgsz), half=half)
+    dt, seen = [0.0, 0.0, 0.0], 0
 
-# Load the labels
-with open('coco_labels.txt', 'r') as f:
-    labels = [line.strip() for line in f.readlines()]
+    # DeepSORT 추적기 초기화
+    deepsort = DeepSort()
 
-# Initialize the interpreter
-interpreter = Interpreter(model_path='detect.tflite')
-interpreter.allocate_tensors()
+    for path, im, im0s, vid_cap, s in dataset:
+        t1 = time_sync()
+        im = torch.from_numpy(im).to(device)
+        im = im.half() if half else im.float()
+        im /= 255
+        if len(im.shape) == 3:
+            im = im[None]
+        t2 = time_sync()
+        dt[0] += t2 - t1
 
-# Get input and output tensors
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+        visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
+        pred = model(im, augment=augment, visualize=visualize)
+        t3 = time_sync()
+        dt[1] += t3 - t2
 
-# Get input size
-input_shape = input_details[0]['shape']
-input_height = input_shape[1]
-input_width = input_shape[2]
+        pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+        dt[2] += time_sync() - t3
 
-# Initialize video capture
-cap = cv2.VideoCapture(0)
+        Arm = Arm_Lib.Arm_Device()
+        joints_0 = [90, 135, 20, 25, 90, 30]
+        Arm.Arm_serial_servo_write6_array(joints_0, 1000)
 
-if not cap.isOpened():
-    print("Error: Could not open video device.")
-    exit()
+        for i, det in enumerate(pred):
+            seen += 1
+            if webcam:
+                p, im0, frame = path[i], im0s[i].copy(), dataset.count
+                s += f'{i}: '
+            else:
+                p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
 
-while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-        print("Error: Failed to read frame from camera.")
-        break
+            p = Path(p)
+            save_path = str(save_dir / p.name)
+            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')
+            s += '%gx%g ' % im.shape[2:]
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
+            imc = im0.copy() if save_crop else im0
+            annotator = Annotator(im0, line_width=line_thickness, example=str(names))
 
-    # Prepare the frame
-    img = cv2.resize(frame, (input_width, input_height))
-    input_data = np.expand_dims(img, axis=0)
-    input_data = input_data.astype(np.float32)
+            # PID 제어기 초기화
+            target_servox = 90
+            target_servoy = 45
+            xservo_pid = PID.PositionalPID(1.9, 0.3, 0.35)
+            yservo_pid = PID.PositionalPID(1.9, 0.3, 0.35)
 
-    # Perform inference
-    interpreter.set_tensor(input_details[0]['index'], input_data)
-    interpreter.invoke()
+            if len(det):
+                det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
 
-    # Get detection results
-    boxes = interpreter.get_tensor(output_details[0]['index'])[0]
-    classes = interpreter.get_tensor(output_details[1]['index'])[0]
-    scores = interpreter.get_tensor(output_details[2]['index'])[0]
+                for c in det[:, -1].unique():
+                    n = (det[:, -1] == c).sum()
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
 
-    # Loop over all detections and draw bounding boxes
-    for i in range(len(scores)):
-        if scores[i] > 0.5:
-            ymin, xmin, ymax, xmax = boxes[i]
-            ymin = int(max(1, ymin * frame.shape[0]))
-            xmin = int(max(1, xmin * frame.shape[1]))
-            ymax = int(min(frame.shape[0], ymax * frame.shape[0]))
-            xmax = int(min(frame.shape[1], xmax * frame.shape[1]))
+                for *xyxy, conf, cls in reversed(det):
+                    c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))
+                    center_point = (int((c1[0]+c2[0])/2), int((c1[1]+c2[1])/2))
+                    # 객체 위치에 원 그리기
+                    cv2.circle(im0, center_point, 5, (0, 255, 0), 2)
+                    # 객체 위치에 텍스트 표시
+                    cv2.putText(im0, str(center_point), center_point, cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 2)
 
-            cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (10, 255, 0), 2)
-            object_name = labels[int(classes[i])]
-            label = '%s: %d%%' % (object_name, int(scores[i]*100))
-            labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-            label_ymin = max(ymin, labelSize[1] + 10)
-            cv2.rectangle(frame, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED)
-            cv2.putText(frame, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                    # 추적기 업데이트
+                    deepsort.update_tracks(det)
 
-    # Display the resulting frame
-    cv2.imshow('Object Detector', frame)
+                    # DeepSORT 추적기에서 추적된 객체의 ID와 위치를 사용하여 로봇팔 제어
+                    for track in deepsort.tracks:
+                        if track.is_confirmed() and track.time_since_update <= 1:
+                            track_id = track.track_id
+                            track_center = track.to_tlbr()  # (x1, y1, x2, y2)
+                            center_x = (track_center[0] + track_center[2]) / 2
+                            center_y = (track_center[1] + track_center[3]) / 2
+                            # PID로 로봇팔의 움직임 제어
+                            xservo_pid.SystemOutput = round(center_x)
+                            xservo_pid.SetStepSignal(320)
+                            xservo_pid.SetInertiaTime(0.01, 0.1)
+                            target_valuex = int(1500 + xservo_pid.SystemOutput)
+                            target_servox = int((target_valuex - 500) / 10)
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+                            yservo_pid.SystemOutput = round(center_y)
+                            yservo_pid.SetStepSignal(240)
+                            yservo_pid.SetInertiaTime(0.01, 0.1)
+                            target_valuey = int(1500 + yservo_pid.SystemOutput)
+                            target_servoy = int((target_valuey - 500) / 10)
 
-cap.release()
-cv2.destroyAllWindows()
+                            Arm.Arm_serial_servo_write2(target_servox, target_servoy, 1000)
+
+            if save_txt: 
+                with open(txt_path + '.txt', 'a') as f:
+                    for *xyxy, conf, cls in reversed(det):
+                        if save_conf:
+                            f.write(('%g ' * 6 + '\n') % (*xyxy, conf, cls))
+                        else:
+                            f.write(('%g ' * 5 + '\n') % (*xyxy, cls))
+
+            if save_img:
+                cv2.imwrite(save_path, im0)
+
+    LOGGER.info(f"Results saved to {save_dir}")
+    return save_dir
