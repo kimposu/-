@@ -1,5 +1,3 @@
-pip install deep_sort_realtime
-
 import subprocess
 import argparse
 import os
